@@ -13,7 +13,7 @@ describe('Issuer#defaultHttpOptions', function () {
   });
 
   it('does not retry', function () {
-    expect(Issuer.defaultHttpOptions).to.have.property('retries', 0);
+    expect(Issuer.defaultHttpOptions).to.have.property('retry', 0);
   });
 
   it('has a rather graceous timeout', function () {

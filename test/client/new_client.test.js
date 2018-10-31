@@ -30,13 +30,13 @@ describe('new Client()', function () {
     expect(client).to.have.property('token_endpoint_auth_method', 'client_secret_basic');
   });
 
-  context('with keystore', function () {
+  describe('with keystore', function () {
     it('validates it is a keystore', function () {
       const issuer = new Issuer();
       [{}, [], 'not a keystore', 2, true, false].forEach(function (notkeystore) {
         expect(function () {
           new issuer.Client({}, notkeystore); // eslint-disable-line no-new
-        }).to.throw('keystore must be an instance of jose.JWK.KeyStore');
+        }).to.throw('keystore must be an instance of jose.JWKS.KeyStore');
       });
     });
   });
@@ -56,7 +56,7 @@ describe('new Client()', function () {
   });
 
   ['token', 'introspection', 'revocation'].forEach((endpoint) => {
-    context(`with ${endpoint}_endpoint_auth_method =~ _jwt`, function () {
+    describe(`with ${endpoint}_endpoint_auth_method =~ _jwt`, function () {
       it(`validates the issuer has supported algs announced if ${endpoint}_endpoint_auth_signing_alg is not defined on a client`, function () {
         expect(function () {
           const issuer = new Issuer({
@@ -93,7 +93,29 @@ describe('new Client()', function () {
     expect(client.metadata).to.have.property('userinfo', 'foobar');
   });
 
-  context('dynamic registration defaults not supported by issuer', function () {
+  describe('common property misuse', function () {
+    it('handles redirect_uri', function () {
+      const issuer = new Issuer();
+      const client = new issuer.Client({
+        redirect_uri: 'https://rp.example.com/cb',
+      });
+
+      expect(client).not.to.have.property('redirect_uri');
+      expect(client).to.have.deep.property('redirect_uris', ['https://rp.example.com/cb']);
+    });
+
+    it('handles response_type', function () {
+      const issuer = new Issuer();
+      const client = new issuer.Client({
+        response_type: 'code id_token',
+      });
+
+      expect(client).not.to.have.property('response_type');
+      expect(client).to.have.deep.property('response_types', ['code id_token']);
+    });
+  });
+
+  describe('dynamic registration defaults not supported by issuer', function () {
     it('token_endpoint_auth_method vs. token_endpoint_auth_methods_supported', function () {
       const issuer = new Issuer({
         issuer: 'https://op.example.com',

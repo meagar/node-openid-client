@@ -5,8 +5,7 @@
 openid-client is a server side [OpenID][openid-connect] Relying Party (RP, Client) implementation for
 Node.js, supports [passport][passport-url].
 
-Notice: openid-client ^2.0.x drops support for Node.js versions less than lts/boron(6.9.0) due to
-Node.js lts/argon end of life on [2018-04-30](https://github.com/nodejs/Release). See the
+Notice: openid-client ^3.x drops support for Node.js versions less than lts/carbon(8.9.0). See the
 [CHANGELOG](/CHANGELOG.md) for a complete list of deprecations and changes.
 
 **Table of Contents**
@@ -34,7 +33,6 @@ openid-client.
   - Unpacking Aggregated Claims
   - Offline Access / Refresh Token Grant
   - Client Credentials Grant
-  - Password Grant
   - Client Authentication
     - none
     - client_secret_basic
@@ -77,21 +75,26 @@ If you or your business use openid-client, please consider becoming a [Patron][s
 
 
 ## Get started
-On the off-chance you want to manage multiple clients for multiple issuers you need to first get
-an Issuer instance.
+
+```
+npm install openid-client --save
+```
+
+Requiring the Issuer is always your first step. Then you'll instantiate it, either via discovery or
+manually.
+
+```js
+const { Issuer } = require('openid-client');
+```
 
 ### via Discovery (recommended)
 ```js
-const { Issuer } = require('openid-client');
-Issuer.discover('https://accounts.google.com') // => Promise
-  .then(function (googleIssuer) {
-    console.log('Discovered issuer %s %O', googleIssuer.issuer, googleIssuer.metadata);
-  });
+const googleIssuer = await Issuer.discover('https://accounts.google.com');
+console.log('Discovered issuer %s %O', googleIssuer.issuer, googleIssuer.metadata);
 ```
 
 ### manually
 ```js
-const { Issuer } = require('openid-client');
 const googleIssuer = new Issuer({
   issuer: 'https://accounts.google.com',
   authorization_endpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
@@ -121,10 +124,8 @@ ID Token or UserInfo response encryption.
 Should your oidc provider have provided you with a registration client uri and registration access
 token you can also have the Client discovered.
 ```js
-googleIssuer.Client.fromUri(registration_client_uri, registration_access_token, [keystore]) // => Promise
-  .then(function (client) {
-    console.log('Discovered client %s %O', client.client_id, client.metadata);
-  });
+const client = await googleIssuer.Client.fromUri(registration_client_uri, registration_access_token, [keystore]);
+console.log('Discovered client %s %O', client.client_id, client.metadata);
 ```
 
 `keystore` is an optional argument for instantiating a client through registration client uri
@@ -152,11 +153,9 @@ client.authorizationPost({
 ### Processing callback
 ```js
 const { state, response_type } = session[authorizationRequestState];
-client.authorizationCallback('https://client.example.com/callback', request.query, { state, response_type }) // => Promise
-  .then(function (tokenSet) {
-    console.log('received and validated tokens %j', tokenSet);
-    console.log('validated id_token claims %j', tokenSet.claims);
-  });
+const tokenSet = await client.authorizationCallback('https://client.example.com/callback', request.query, { state, response_type });
+console.log('received and validated tokens %j', tokenSet);
+console.log('validated id_token claims %j', tokenSet.claims);
 ```
 
 Aside from `state` and `response_type`, checks for `nonce` (implicit and hybrid responses) and
@@ -180,9 +179,9 @@ Values are `undefined` if these were not provided in the response. Additionally,
 responses a `response` property is available with the response object from the used http client.
 
 ### Handling multiple response modes
-When handling multiple response modes with one single pass you can use `#callbackParams`
+When handling multiple response modes with one single code pass you can use `#callbackParams`
 to get the params object from the koa/express/node request object or a url string.
-(http.IncomingMessage). If form_post is your response_type you need to include a body parser prior.
+(http.IncomingMessage). If form_post is your response_mode you need to include a body parser prior.
 
 ```js
 client.callbackParams('https://client.example.com/cb?code=code'); // => { code: 'code' };
@@ -205,57 +204,49 @@ app.use(function (req, res, next) {
 
 ### Refreshing a token
 ```js
-client.refresh(refreshToken) // => Promise
-  .then(function (tokenSet) {
-    console.log('refreshed and validated tokens %j', tokenSet);
-    console.log('refreshed id_token claims %j', tokenSet.claims);
-  });
+const tokenSet = await client.refresh(refreshToken);
+console.log('refreshed and validated tokens %j', tokenSet);
+console.log('refreshed id_token claims %j', tokenSet.claims);
 ```
 Tip: accepts TokenSet as well as direct refresh token values;
 
 ### Revoke a token
 ```js
-client.revoke(token, [tokenTypeHint]) // => Promise
-  .then(function (response) {
-    console.log('revoked token %s', token, response);
-  });
+const response = await client.revoke(token, [tokenTypeHint]);
+console.log('revoked token %s', token, response);
 ```
 
 ### Introspect a token
 ```js
-client.introspect(token, [tokenTypeHint]) // => Promise
-  .then(function (response) {
-    console.log('token details %j', response);
-  });
+const response = await client.introspect(token, [tokenTypeHint]);
+console.log('token details %j', response);
 ```
 
 ### Fetching userinfo
 ```js
-client.userinfo(accessToken) // => Promise
-  .then(function (userinfo) {
-    console.log('userinfo %j', userinfo);
-  });
+const userinfo = await client.userinfo(accessToken);
+console.log('userinfo %j', userinfo);
 ```
 Tip: accepts TokenSet as well as direct access token values;
 
 via POST
 ```js
-client.userinfo(accessToken, { verb: 'post' }); // => Promise
+const userinfo = await client.userinfo(accessToken, { verb: 'post' });
 ```
 
 with extra query/body payload
 ```js
-client.userinfo(accessToken, { params: { fields: 'email,ids_for_business' } }); // => Promise
+const userinfo = await client.userinfo(accessToken, { params: { fields: 'email,ids_for_business' } });
 ```
 
 auth via query
 ```js
-client.userinfo(accessToken, { via: 'query' }); // => Promise
+const userinfo = await client.userinfo(accessToken, { via: 'query' });
 ```
 
 auth via body
 ```js
-client.userinfo(accessToken, { verb: 'post', via: 'body' }); // => Promise
+const userinfo = await client.userinfo(accessToken, { verb: 'post', via: 'body' });
 ```
 
 userinfo also handles (as long as you have the proper metadata configured) responses that are:
@@ -289,14 +280,12 @@ let claims = {
   },
 };
 
-client.fetchDistributedClaims(claims, { src2: 'bearer.for.src2' }) // => Promise
-  .then(function (output) {
-    console.log('claims %j', claims); // ! also modifies original input, does not create a copy
-    console.log('output %j', output);
-    // removes fetched names and sources and removes _claim_names and _claim_sources members if they
-    // are empty
-  });
-  // when rejected the error will have a property 'src' with the source name it relates to
+const output = await client.fetchDistributedClaims(claims, { src2: 'bearer.for.src2' });
+console.log('claims %j', claims); // ! also modifies original input, does not create a copy
+console.log('output %j', output);
+// removes fetched names and sources and removes _claim_names and _claim_sources members if they
+// are empty
+// when rejected the error will have a property 'src' with the source name it relates to
 ```
 
 ### Unpacking Aggregated Claims
@@ -313,71 +302,61 @@ let claims = {
   },
 };
 
-client.unpackAggregatedClaims(claims) // => Promise, autodiscovers JWT issuers, verifies signatures
-  .then(function (output) {
-    console.log('claims %j', claims); // ! also modifies original input, does not create a copy
-    console.log('output %j', output);
-    // removes fetched names and sources and removes _claim_names and _claim_sources members if they
-    // are empty
-  });
-  // when rejected the error will have a property 'src' with the source name it relates to
+const output = await client.unpackAggregatedClaims(claims); // automatically discovers issuers, verifies signatures
+console.log('claims %j', claims); // ! also modifies original input, does not create a copy
+console.log('output %j', output);
+// removes fetched names and sources and removes _claim_names and _claim_sources members if they
+// are empty
+// when rejected the error will have a property 'src' with the source name it relates to
 ```
 
 ### Custom token endpoint grants
 Use when the token endpoint also supports additional grant types.
 
 ```js
-client.grant({
+const response = await client.grant({
   grant_type: 'client_credentials',
   scope: 'api:read',
-}); // => Promise
+});
 
-client.grant({
-  grant_type: 'password',
-  username: 'johndoe',
-  password: 'A3ddj3w',
-  scope: 'profile',
-}); // => Promise
+const response = await client.grant({
+  grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
+  subject_token: '...',
+  subject_token_type: '...',
+});
 ```
 
 ### Registering new client (via Dynamic Registration)
 ```js
 const opts = { keystore, initialAccessToken }; // both optional
-issuer.Client.register(metadata, [opts]) // => opts optional, Promise
-  .then(function (client) {
-    console.log('Registered client %s, %O', client.client_id, client.metadata);
-  });
+const client = await issuer.Client.register(metadata, [opts]);
+console.log('Registered client %s, %O', client.client_id, client.metadata);
 ```
 
 ### Generating a signed/encrypted Request Object
 ```js
-client.requestObject({ max_age: 300, redirect_uri })
-  .then(function (request) {
-    console.log('JWT Request Object %s', request)
-  });
+const requestObject = await client.requestObject({ max_age: 300, redirect_uri });
+console.log('JWT Request Object %s', requestObject);
 ```
 
 This will use the client metadata `request_object_signing_alg`, `request_object_encryption_alg` and
 `request_object_encryption_enc`, but you can provide the signing and/or encryption algs explicitly
 
 ```js
-client.requestObject({ max_age: 300, redirect_uri }, {
+const requestObject = await client.requestObject({ max_age: 300, redirect_uri }, {
   // sign: '...',
   // encrypt: {
   //   alg: '...',
   //   enc: '...',
   // }
-}).then(function (request) {
-  console.log('JWT Request Object %s', request)
 });
+console.log('JWT Request Object %s', requestObject);
 ```
 
 ### WebFinger discovery
 ```js
-Issuer.webfinger(userInput) // => Promise
-  .then(function (issuer) {
-    console.log('Discovered issuer %s %O', issuer.issuer, issuer.metadata);
-  });
+const issuer = await Issuer.webfinger(userInput);
+console.log('Discovered issuer %s %O', issuer.issuer, issuer.metadata);
 ```
 Accepts, normalizes, discovers and validates the discovery of User Input using E-Mail, URL, acct,
 Hostname and Port syntaxes as described in [Discovery 1.0][feature-discovery].
@@ -390,20 +369,41 @@ Uses already discovered (cached) issuers where applicable.
 time. It also comes with few helpers.
 
 ```js
-client.authorizationCallback(..., ...).then(function (tokenSet) {
-  console.log('tokenSet#expires_at', tokenSet.expires_at);
+const tokenSet = await client.authorizationCallback(...);
+console.log('tokenSet#expires_at', tokenSet.expires_at);
+console.log('tokenSet#expires_in', tokenSet.expires_in);
+setTimeout(function () {
   console.log('tokenSet#expires_in', tokenSet.expires_in);
-  setTimeout(function () {
-    console.log('tokenSet#expires_in', tokenSet.expires_in);
-  }, 2000);
-  console.log('tokenSet#expired()', tokenSet.expired());
-  console.log('tokenSet#claims', tokenSet.claims);
-});
+}, 2000);
+console.log('tokenSet#expired()', tokenSet.expired());
+console.log('tokenSet#claims', tokenSet.claims);
+```
+
+### Retrieving Issuer JWKs
+Retrieved JWKs are [`@panva/jose`][panva-jose] `JWKS.KeyStore` instances.
+```js
+const keystore = await issuer.keystore(); // retrieves the jwks_uri or loads a cached one
+await issuer.keystore(true); // re-fetches the jwks_uri (in case you need to manually refetch)
+```
+
+### Retrieving specific Issuer JWK
+Retrieved JWKs are [`@panva/jose`][panva-jose] `JWK.Key` instances. Using this method will refresh the keystore
+on every unknown key query but also only upto once every minute.
+
+```js
+// with just one argument it expects to find a single match, if no or multiple matches are found
+// it throws
+await issuer.key({ kid: '...' });
+await issuer.key({ kty: 'RSA', use: 'sig' });
+await issuer.key({ alg: 'RS256' });
+
+// with a second argument allowMulti true it will return the first one from multiple matches
+await issuer.key({ alg: 'RS256' }, true);
 ```
 
 ## Usage with passport
-Once you have a Client instance, just pass it to the Strategy constructor. Issuer is best
-discovered, Client passed properties manually or via an uri (see [get-started](#get-started)).
+Once you have a Client instance, just pass it to the Strategy constructor (see below). Issuer is
+best discovered, Client passed properties manually or via an uri (see [get-started](#get-started)).
 
 Verify function is invoked with a TokenSet, userinfo only when requested, last argument is always
 the done function which you invoke once you found your user.
@@ -446,6 +446,66 @@ app.get('/auth/cb', passport.authenticate('oidc', { successRedirect: '/', failur
 ```
 
 ## Configuration
+
+### Issuer properties
+
+These IANA registered OAuth Authorization Server Metadata / OpenID Provider Metadata properties have
+functionality bound to them:
+
+<details>
+  <summary>(Click to expand) OAuth Authorization Server Metadata / OpenID Provider Metadata properties that have behaviour bound to them.
+</summary>
+  <br>
+
+- `issuer` - issuer identifier, used when asserting signed response payloads
+- `jwks_uri` - used when fetching the issuer's asymmetric signing and encryption keys
+- `authorization_endpoint` - used when generating the authorization redirect url
+- `userinfo_endpoint` - used when fetching userinfo
+- `token_endpoint` - used when calling the token endpoint
+- `introspection_endpoint` - used when fetching introspection responses
+- `revocation_endpoint` - used when revoking a token
+- `registration_endpoint` - used when dynamically registering a client
+- `end_session_endpoint` - used when generating the end session redirect url
+- `code_challenge_methods_supported` - used by the passport strategy to figure out which challenge method to use
+- `introspection_endpoint_auth_signing_alg_values_supported` - used when client using `*_jwt` auth method doesn't have a specific introspection auth signing alg value defined
+- `revocation_endpoint_auth_signing_alg_values_supported` - used when client using `*_jwt` auth method doesn't have a specific revocation auth signing alg value defined
+- `token_endpoint_auth_signing_alg_values_supported` - used when client using `*_jwt` auth method doesn't have a specific token auth signing alg value defined
+
+</details>
+
+### Client properties
+
+These Client Metadata properties have functionality bound to them.
+
+<details>
+  <summary>(Click to expand) Client Metadata properties that have behaviour bound to them.
+</summary>
+  <br>
+
+- `client_id` - `¯\_(ツ)_/¯`
+- `client_secret` - `¯\_(ツ)_/¯`
+- `redirect_uris` - if a single redirect_uri is present in the array it'll be used in relevant helpers, if you have more just omit it altogether and pass the values explicitly to these helpers
+- `default_max_age` - when provided ID Tokens will be checked both for presence of the auth_time claim as well as its value during the authorization callback phase
+- `id_token_signed_response_alg` - asserted ID Token signing algorithm
+- `require_auth_time` - when true ID Tokens will be checked for presence of the auth_time claim
+- `response_types` - if a single response_type is present in the array it'll be used in relevant helpers, if you have more just omit it altogether and pass the values explicitly to these helpers
+- `post_logout_redirect_uris` - if a single post_logout_redirect_uri is present in the array it'll be used in relevant helpers, if you have more just omit it altogether and pass the values explicitly to these helpers
+- `token_endpoint_auth_method` - client authentication method for the token endpoint
+- `introspection_endpoint_auth_method` - client authentication method for the introspection endpoint
+- `revocation_endpoint_auth_method` - client authentication method for the revocation endpoint
+- `id_token_encrypted_response_alg` - negotiated id token encryption alg
+- `id_token_encrypted_response_enc` - negotiated id token encryption enc alg
+- `userinfo_signed_response_alg` - negotiated userinfo signing alg
+- `userinfo_encrypted_response_alg` - negotiated userinfo encryption alg
+- `userinfo_encrypted_response_enc` - negotiated userinfo encryption enc alg
+- `introspection_endpoint_auth_signing_alg` - used for `*_jwt` auth method signing
+- `revocation_endpoint_auth_signing_alg` - used for `*_jwt` auth method signing
+- `token_endpoint_auth_signing_alg` - used for `*_jwt` auth method signing
+- `request_object_signing_alg` - negotiated request object signing alg
+- `request_object_encryption_alg` - negotiated request object encryption alg
+- `request_object_encryption_enc` - negotiated request object encryption enc alg
+
+</details>
 
 ### Client Authentication explained
 
@@ -490,7 +550,7 @@ openid-client uses [got][got-library] for http requests with the following defau
 const DEFAULT_HTTP_OPTIONS = {
   followRedirect: false,
   headers: { 'User-Agent': `${pkg.name}/${pkg.version} (${pkg.homepage})` },
-  retries: 0,
+  retry: 0,
   timeout: 1500,
 };
 ```
@@ -507,33 +567,8 @@ console.log('httpOptions %j', Issuer.defaultHttpOptions);
 
 ### Proxy settings
 Because of the lightweight nature of [got][got-library] library the client will not use
-environment-defined http(s) proxies. In order to have them used you'll need to either provide your own http request
-implementation using the provided `httpClient` setter or use the bundled [request][request-library]
-one.
-
-Custom implementation:
-```js
-/*
- * url {String}
- * options {Object}
- * options.headers {Object}
- * options.body {String|Object}
- * options.form {Boolean}
- * options.query {Object}
- * options.timeout {Number}
- * options.retries {Number}
- * options.followRedirect {Boolean}
- */
-
-Issuer.httpClient = {
-   get(url, options) {}, // return Promise
-   post(url, options) {}, // return Promise
-   HTTPError, // used error constructor
-};
-```
-
-Bundled (and maintained + tested) request implementation after you've added [request][request-library]
-to your package.json bundle:
+environment-defined http(s) proxies. If you need those require the  [`request`][request-library]
+library implementation.
 
 ```
 npm install request@^2.0.0 --save
@@ -569,3 +604,4 @@ Issuer.useRequest();
 [sponsor-auth0]: https://auth0.com/overview?utm_source=GHsponsor&utm_medium=GHsponsor&utm_campaign=openid-client&utm_content=auth
 [support-patreon]: https://www.patreon.com/panva
 [support-paypal]: https://www.paypal.me/panva
+[panva-jose]: https://github.com/panva/jose
